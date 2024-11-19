@@ -25,6 +25,7 @@ from __future__ import print_function
 
 from Crypto.Cipher import DES, AES
 from Crypto.Random import get_random_bytes
+from Crypto.Util.Padding import pad
 import sys
 import base64
 import array
@@ -51,12 +52,19 @@ main_grp.add_option('-a', '--aged', help = '(mandatory between v19.2 and v22.2) 
 parser.option_groups.extend([main_grp])
 
 # Handful functions
-def aes_cbc_decrypt(encrypted_password, decryption_key, iv):
-    unpad = lambda s : s[:-ord(s[len(s)-1:])]
-    crypter = AES.new(decryption_key, AES.MODE_CBC, iv)
-    decrypted_password = unpad(crypter.decrypt(encrypted_password))
+# def aes_cbc_decrypt(encrypted_password, decryption_key, iv):
+#     unpad = lambda s : s[:-ord(s[len(s)-1:])]
+#     crypter = AES.new(decryption_key, AES.MODE_CBC, iv)
+#     decrypted_password = unpad(crypter.decrypt(encrypted_password))
     
-    return decrypted_password.decode('utf-8')
+#     return decrypted_password.decode('utf-8')
+
+def aes_cbc_encrypt(unencrypted_password, encryption_key):
+    iv = get_random_bytes(16)
+    cipher = AES.new(encryption_key, AES.MODE_CBC, iv)
+    ciphertext = cipher.encrypt(pad(unencrypted_password.encode('utf-8'), AES.block_size))
+
+    return iv, ciphertext
 
 # def aes_gcm_decrypt(encrypted_password, decryption_key, nonce, aad, tag):
 #     crypter = AES.new(decryption_key, AES.MODE_GCM, nonce)
@@ -115,22 +123,38 @@ def decrypt_v3(encrypted, parser):
     
     return decrypted 
 
-def decrypt_v19_2(encrypted, db_system_id, parser):
-    encrypted_password = base64.b64decode(encrypted)
+# def decrypt_v19_2(encrypted, db_system_id, parser):
+#     encrypted_password = base64.b64decode(encrypted)
     
+#     salt = array.array('b', [6, -74, 97, 35, 61, 104, 50, -72])
+#     key = hashlib.pbkdf2_hmac("sha256", db_system_id.encode(), salt, 5000, 32)
+
+#     iv = encrypted_password[:16]
+#     encrypted_password = encrypted_password[16:]
+    
+#     try:
+#         decrypted = aes_cbc_decrypt(encrypted_password, key, iv)
+#     except:
+#         parser.error('Error during decryption. Remember, for a v4 -> v19.1 password you need the "-o" option'
+#                      ' and for a v19.2 -> v22.2 password you need the "-a" option')
+    
+#     return decrypted
+
+def encrypt_v19_2(unencrypted, db_system_id, parser):
     salt = array.array('b', [6, -74, 97, 35, 61, 104, 50, -72])
     key = hashlib.pbkdf2_hmac("sha256", db_system_id.encode(), salt, 5000, 32)
 
-    iv = encrypted_password[:16]
-    encrypted_password = encrypted_password[16:]
+    iv, ciphertext = aes_cbc_encrypt(unencrypted, key)
+
+    #    IIIIIIIIIIIIIIIIEEEEEEEEEEEEEEEE
+    #    iv = encrypted_password[:16] (I)
+    #    encrypted_password = encrypted_password[16:] (E)
     
-    try:
-        decrypted = aes_cbc_decrypt(encrypted_password, key, iv)
-    except:
-        parser.error('Error during decryption. Remember, for a v4 -> v19.1 password you need the "-o" option'
-                     ' and for a v19.2 -> v22.2 password you need the "-a" option')
-    
-    return decrypted
+    encrypted_password = iv + ciphertext
+    encoded_password = base64.b64encode(encrypted_password)
+
+    return encoded_password.decode('utf-8')
+
 
 # def decrypt_v23_1(encrypted, db_system_id, parser):
 #     encrypted_password = base64.b64decode(encrypted)
@@ -150,14 +174,13 @@ def decrypt_v19_2(encrypted, db_system_id, parser):
 
 #     return decrypted
 
-def encrypt_v23_1(decrypted, db_system_id, parser):
-    # Field header (or field name)
+def encrypt_v23_1(unencrypted, db_system_id, parser):
     aad = "password".encode()
 
     salt = array.array('b', [6, -74, 97, 35, 61, 104, 50, -72])
     key = hashlib.pbkdf2_hmac("sha256", db_system_id.encode(), salt, 5000, 32)
 
-    cipher, ciphertext, tag = aes_gcm_encrypt(decrypted, key, aad)
+    cipher, ciphertext, tag = aes_gcm_encrypt(unencrypted, key, aad)
 
     #     NNNNNNNNNNNEEEEEEEEEEETTTTTTTTTTTTTTTT
     #     nonce = encrypted_password[:12]                 (N)
@@ -167,7 +190,7 @@ def encrypt_v23_1(decrypted, db_system_id, parser):
     encrypted_password = cipher.nonce + ciphertext + tag
     encoded_password = base64.b64encode(encrypted_password)
 
-    return encoded_password
+    return encoded_password.decode('utf-8')
 
 def main():
     """
@@ -180,7 +203,7 @@ def main():
         parser.error("Please specify a password to decrypt")
     
     print('sqldeveloperpassworddecryptor.py version %s\n' % VERSION)
-    print("[+] decrypted password: %s" % options.encrypted_password)
+    print("[+] unencrypted password: %s" % options.encrypted_password)
     
     if options.db_system_id_value:
         print("[+] db.system.id value: %s" % options.db_system_id_value)
@@ -191,7 +214,7 @@ def main():
         
         elif options.aged:
         # v19.2->v22.2 decryption
-            print("\n[+] decrypted password: %s" % decrypt_v19_2(options.encrypted_password, options.db_system_id_value, parser))
+            print("\n[+] encrypted password: %s" % encrypt_v19_2(options.encrypted_password, options.db_system_id_value, parser))
     
         else:
         # from v23.1 decryption
