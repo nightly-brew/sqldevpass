@@ -46,32 +46,16 @@ main_grp.add_option('-p', '--encrypted-password', help = '(mandatory): password 
 main_grp.add_option('-d', '--db-system-id-value', help = '(mandatory from v4): installation-unique value of "db.system.id" attribute in the "product-preferences.xml" file, or the export file encryption key. Ex: -d 6b2f64b2-e83e-49a5-9abf-cb2cd7e3a9ee', nargs = 1)
 main_grp.add_option('-o', '--old', help = '(mandatory between v4 and v19.1) if the password you want to decrypt is for a product version between 4 and 19.1', action = 'store_true', default = False)
 main_grp.add_option('-a', '--aged', help = '(mandatory between v19.2 and v22.2) if the password you want to decrypt is for a product version between 19.2 and 22.2', action = 'store_true', default = False)
-#main_grp.add_option('-c', '--connections-file', help = '(optional): "connections.xml" file containing encrypted passwords.', nargs = 1)
-#main_grp.add_option('-f', '--db-system-id-file', help = '(optional): "product-preferences.xml" file  containing the "db.system.id" attribute value.', nargs = 1)
 
 parser.option_groups.extend([main_grp])
 
 # Handful functions
-# def aes_cbc_decrypt(encrypted_password, decryption_key, iv):
-#     unpad = lambda s : s[:-ord(s[len(s)-1:])]
-#     crypter = AES.new(decryption_key, AES.MODE_CBC, iv)
-#     decrypted_password = unpad(crypter.decrypt(encrypted_password))
-    
-#     return decrypted_password.decode('utf-8')
-
 def aes_cbc_encrypt(unencrypted_password, encryption_key):
     iv = get_random_bytes(16)
     cipher = AES.new(encryption_key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(unencrypted_password.encode('utf-8'), AES.block_size))
 
     return iv, ciphertext
-
-# def aes_gcm_decrypt(encrypted_password, decryption_key, nonce, aad, tag):
-#     crypter = AES.new(decryption_key, AES.MODE_GCM, nonce)
-#     crypter.update(aad)
-#     decrypted_password = crypter.decrypt_and_verify(encrypted_password, tag)
-
-#     return decrypted_password.decode('utf-8')
 
 def aes_gcm_encrypt(unencrypted_password, encryption_key, aad):
     nonce = get_random_bytes(12)
@@ -80,38 +64,12 @@ def aes_gcm_encrypt(unencrypted_password, encryption_key, aad):
     ciphertext, tag = cipher.encrypt_and_digest(unencrypted_password.encode('utf-8'))
 
     return cipher, ciphertext, tag
-    
-# def des_cbc_decrypt(encrypted_password, decryption_key, iv):
-#     unpad = lambda s : s[:-ord(s[len(s)-1:])]
-#     crypter = DES.new(decryption_key, DES.MODE_CBC, iv)
-#     decrypted_password = unpad(crypter.decrypt(encrypted_password))
-    
-#     return decrypted_password.decode('utf-8')
 
 def des_cbc_encrypt(unencrypted_password, encryption_key, iv):
     cipher = DES.new(encryption_key, DES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(unencrypted_password.encode('utf-8'), DES.block_size))
     
     return ciphertext
-
-# def decrypt_v4(encrypted, db_system_id):
-#     encrypted_password = base64.b64decode(encrypted)
-    
-#     salt = bytearray.fromhex('051399429372e8ad')
-#     num_iteration = 42
-            
-#     # key generation from an installation-unique value with a fixed salt
-#     key = bytearray(db_system_id, 'ascii') + salt
-#     for i in range(num_iteration):
-#         m = hashlib.md5(key)
-#         key = m.digest()
-    
-#     secret_key = key[:8]
-#     iv = key[8:]
-    
-#     decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
-    
-#     return decrypted 
 
 def encrypt_v4(unencrypted, db_system_id):
     salt = bytearray.fromhex('051399429372e8ad')
@@ -131,22 +89,6 @@ def encrypt_v4(unencrypted, db_system_id):
 
     return encoded_password.decode('utf-8')
 
-# def decrypt_v3(encrypted, parser):
-#     if len(encrypted) % 2 != 0:
-#         parser.error('v3 encrypted password length is not even (%s), aborting.' % len(encrypted))
-    
-#     if not(encrypted.startswith("05")):
-#         parser.error('v3 encrypted password string not beginning with "05", aborting.\nRemember, for a v4 password you need the db.system.id value !')
-    
-#     encrypted = bytearray.fromhex(encrypted)
-#     secret_key = encrypted[1:9]
-#     encrypted_password = encrypted[9:]
-#     iv = bytearray("\x00" * 8, 'ascii')
-    
-#     decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
-    
-#     return decrypted 
-
 def encrypt_v3(unencrypted, parser):
     iv = bytearray("\x00" * 8, 'ascii')
     secret_key = get_random_bytes(8)
@@ -162,23 +104,6 @@ def encrypt_v3(unencrypted, parser):
     
     return encoded
 
-# def decrypt_v19_2(encrypted, db_system_id, parser):
-#     encrypted_password = base64.b64decode(encrypted)
-    
-#     salt = array.array('b', [6, -74, 97, 35, 61, 104, 50, -72])
-#     key = hashlib.pbkdf2_hmac("sha256", db_system_id.encode(), salt, 5000, 32)
-
-#     iv = encrypted_password[:16]
-#     encrypted_password = encrypted_password[16:]
-    
-#     try:
-#         decrypted = aes_cbc_decrypt(encrypted_password, key, iv)
-#     except:
-#         parser.error('Error during decryption. Remember, for a v4 -> v19.1 password you need the "-o" option'
-#                      ' and for a v19.2 -> v22.2 password you need the "-a" option')
-    
-#     return decrypted
-
 def encrypt_v19_2(unencrypted, db_system_id, parser):
     salt = array.array('b', [6, -74, 97, 35, 61, 104, 50, -72])
     key = hashlib.pbkdf2_hmac("sha256", db_system_id.encode(), salt, 5000, 32)
@@ -193,25 +118,6 @@ def encrypt_v19_2(unencrypted, db_system_id, parser):
     encoded_password = base64.b64encode(encrypted_password)
 
     return encoded_password.decode('utf-8')
-
-
-# def decrypt_v23_1(encrypted, db_system_id, parser):
-#     encrypted_password = base64.b64decode(encrypted)
-
-#     salt = array.array('b', [6, -74, 97, 35, 61, 104, 50, -72])
-#     key = hashlib.pbkdf2_hmac("sha256", db_system_id.encode(), salt, 5000, 32)
-
-#     nonce = encrypted_password[:12]
-#     tag = encrypted_password[-16:]
-#     encrypted_password = encrypted_password[12:-16]
-
-#     try:
-#         decrypted = aes_gcm_decrypt(encrypted_password, key, nonce, "password".encode(), tag)
-#     except:
-#         parser.error('Error during decryption. Remember, for a v4 -> v19.1 password you need the "-o" option'
-#                      ' and for a v19.2 -> v22.2 password you need the "-a" option')
-
-#     return decrypted
 
 def encrypt_v23_1(unencrypted, db_system_id, parser):
     aad = "password".encode()

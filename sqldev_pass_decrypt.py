@@ -44,14 +44,14 @@ main_grp.add_option('-p', '--encrypted-password', help = '(mandatory): password 
 main_grp.add_option('-d', '--db-system-id-value', help = '(mandatory from v4): installation-unique value of "db.system.id" attribute in the "product-preferences.xml" file, or the export file encryption key. Ex: -d 6b2f64b2-e83e-49a5-9abf-cb2cd7e3a9ee', nargs = 1)
 main_grp.add_option('-o', '--old', help = '(mandatory between v4 and v19.1) if the password you want to decrypt is for a product version between 4 and 19.1', action = 'store_true', default = False)
 main_grp.add_option('-a', '--aged', help = '(mandatory between v19.2 and v22.2) if the password you want to decrypt is for a product version between 19.2 and 22.2', action = 'store_true', default = False)
-#main_grp.add_option('-c', '--connections-file', help = '(optional): "connections.xml" file containing encrypted passwords.', nargs = 1)
-#main_grp.add_option('-f', '--db-system-id-file', help = '(optional): "product-preferences.xml" file  containing the "db.system.id" attribute value.', nargs = 1)
 
 parser.option_groups.extend([main_grp])
 
 # Handful functions
+def unpad(s):
+    return s[:-ord(s[len(s)-1:])]
+
 def aes_cbc_decrypt(encrypted_password, decryption_key, iv):
-    unpad = lambda s : s[:-ord(s[len(s)-1:])]
     crypter = AES.new(decryption_key, AES.MODE_CBC, iv)
     decrypted_password = unpad(crypter.decrypt(encrypted_password))
     
@@ -65,7 +65,6 @@ def aes_gcm_decrypt(encrypted_password, decryption_key, nonce, aad, tag):
     return decrypted_password.decode('utf-8')
     
 def des_cbc_decrypt(encrypted_password, decryption_key, iv):
-    unpad = lambda s : s[:-ord(s[len(s)-1:])]
     crypter = DES.new(decryption_key, DES.MODE_CBC, iv)
     decrypted_password = unpad(crypter.decrypt(encrypted_password))
     
