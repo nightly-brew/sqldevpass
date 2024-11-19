@@ -73,55 +73,94 @@ def aes_cbc_encrypt(unencrypted_password, encryption_key):
 
 #     return decrypted_password.decode('utf-8')
 
-def aes_gcm_encrypt(decrypted_password, encryption_key, aad):
+def aes_gcm_encrypt(unencrypted_password, encryption_key, aad):
     nonce = get_random_bytes(12)
     cipher = AES.new(encryption_key, AES.MODE_GCM, nonce)
     cipher.update(aad)
-    ciphertext, tag = cipher.encrypt_and_digest(decrypted_password.encode('utf-8'))
+    ciphertext, tag = cipher.encrypt_and_digest(unencrypted_password.encode('utf-8'))
 
     return cipher, ciphertext, tag
     
-def des_cbc_decrypt(encrypted_password, decryption_key, iv):
-    unpad = lambda s : s[:-ord(s[len(s)-1:])]
-    crypter = DES.new(decryption_key, DES.MODE_CBC, iv)
-    decrypted_password = unpad(crypter.decrypt(encrypted_password))
+# def des_cbc_decrypt(encrypted_password, decryption_key, iv):
+#     unpad = lambda s : s[:-ord(s[len(s)-1:])]
+#     crypter = DES.new(decryption_key, DES.MODE_CBC, iv)
+#     decrypted_password = unpad(crypter.decrypt(encrypted_password))
     
-    return decrypted_password.decode('utf-8')
+#     return decrypted_password.decode('utf-8')
 
-def decrypt_v4(encrypted, db_system_id):
-    encrypted_password = base64.b64decode(encrypted)
+def des_cbc_encrypt(unencrypted_password, encryption_key, iv):
+    cipher = DES.new(encryption_key, DES.MODE_CBC, iv)
+    ciphertext = cipher.encrypt(pad(unencrypted_password.encode('utf-8'), DES.block_size))
     
+    return ciphertext
+
+# def decrypt_v4(encrypted, db_system_id):
+#     encrypted_password = base64.b64decode(encrypted)
+    
+#     salt = bytearray.fromhex('051399429372e8ad')
+#     num_iteration = 42
+            
+#     # key generation from an installation-unique value with a fixed salt
+#     key = bytearray(db_system_id, 'ascii') + salt
+#     for i in range(num_iteration):
+#         m = hashlib.md5(key)
+#         key = m.digest()
+    
+#     secret_key = key[:8]
+#     iv = key[8:]
+    
+#     decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
+    
+#     return decrypted 
+
+def encrypt_v4(unencrypted, db_system_id):
     salt = bytearray.fromhex('051399429372e8ad')
     num_iteration = 42
-            
+
     # key generation from an installation-unique value with a fixed salt
     key = bytearray(db_system_id, 'ascii') + salt
     for i in range(num_iteration):
         m = hashlib.md5(key)
         key = m.digest()
-    
+
     secret_key = key[:8]
     iv = key[8:]
-    
-    decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
-    
-    return decrypted 
 
-def decrypt_v3(encrypted, parser):
-    if len(encrypted) % 2 != 0:
-        parser.error('v3 encrypted password length is not even (%s), aborting.' % len(encrypted))
+    encrypted_password = des_cbc_encrypt(unencrypted, secret_key, iv)
+    encoded_password = base64.b64encode(encrypted_password)
+
+    return encoded_password.decode('utf-8')
+
+# def decrypt_v3(encrypted, parser):
+#     if len(encrypted) % 2 != 0:
+#         parser.error('v3 encrypted password length is not even (%s), aborting.' % len(encrypted))
     
-    if not(encrypted.startswith("05")):
-        parser.error('v3 encrypted password string not beginning with "05", aborting.\nRemember, for a v4 password you need the db.system.id value !')
+#     if not(encrypted.startswith("05")):
+#         parser.error('v3 encrypted password string not beginning with "05", aborting.\nRemember, for a v4 password you need the db.system.id value !')
     
-    encrypted = bytearray.fromhex(encrypted)
-    secret_key = encrypted[1:9]
-    encrypted_password = encrypted[9:]
+#     encrypted = bytearray.fromhex(encrypted)
+#     secret_key = encrypted[1:9]
+#     encrypted_password = encrypted[9:]
+#     iv = bytearray("\x00" * 8, 'ascii')
+    
+#     decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
+    
+#     return decrypted 
+
+def encrypt_v3(unencrypted, parser):
     iv = bytearray("\x00" * 8, 'ascii')
+    secret_key = get_random_bytes(8)
+
+    encrypted_pass = des_cbc_encrypt(unencrypted, secret_key, iv)
     
-    decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
+    #     05KKKKKKKKEEEEEEEEEEEEEEEEEEEE
+    #     secret_key = encrypted[1:9]        (K)
+    #     encrypted_password = encrypted[9:] (E)
     
-    return decrypted 
+    encrypted = bytearray("\x05", 'ascii') + secret_key + encrypted_pass
+    encoded = bytes(encrypted).hex()
+    
+    return encoded
 
 # def decrypt_v19_2(encrypted, db_system_id, parser):
 #     encrypted_password = base64.b64decode(encrypted)
@@ -210,7 +249,7 @@ def main():
         
         # v4->v19.1 decryption
         if options.old:
-            print("\n[+] decrypted password: %s" % decrypt_v4(options.encrypted_password, options.db_system_id_value))
+            print("\n[+] encrypted password: %s" % encrypt_v4(options.encrypted_password, options.db_system_id_value))
         
         elif options.aged:
         # v19.2->v22.2 decryption
@@ -222,7 +261,7 @@ def main():
 
     else:
         #v3 decryption
-        print("\n[+] decrypted password: %s" % decrypt_v3(options.encrypted_password, parser))
+        print("\n[+] encrypted password: %s" % encrypt_v3(options.encrypted_password, parser))
     
     return None
     
