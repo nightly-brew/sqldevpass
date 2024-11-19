@@ -119,7 +119,11 @@ def decrypt_v4(encrypted, db_system_id):
     secret_key = key[:8]
     iv = key[8:]
     
-    decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
+    try:
+        decrypted = des_cbc_decrypt(encrypted_password, secret_key, iv)
+    except:
+        print('Error during decryption')
+        exit(1)
     
     return decrypted 
 
