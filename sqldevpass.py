@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import sqldev_pass_algo as algo
+import sqldevpass_algo as algo
 
 # Options definition
 parser = argparse.ArgumentParser(
-    prog = 'sqldev_pass',
+    prog = 'sqldevpass',
     description = 'Encrypt/Decrypt sql developer and plsql developer connection passwords')
 
 parser.add_argument('-m', '--mode', help = 'Operation mode', choices = ['enc', 'dec'], type=str, required = True)
