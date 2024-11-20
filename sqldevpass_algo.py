@@ -16,7 +16,7 @@ def aes_cbc_encrypt(unencrypted_password, encryption_key, iv):
     cipher = AES.new(encryption_key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(unencrypted_password.encode('utf-8'), AES.block_size))
 
-    return iv, ciphertext
+    return ciphertext
 
 def aes_cbc_decrypt(encrypted_password, decryption_key, iv):
     crypter = AES.new(decryption_key, AES.MODE_CBC, iv)
