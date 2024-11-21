@@ -16,10 +16,10 @@ parser = argparse.ArgumentParser(
 parser.add_argument('-e', '--encrypt', help = 'Switch from decryption to encryption', action = 'store_true')
 parser.add_argument('-p', '--password', help = 'Password string to encrypt/decrypt', nargs = 1, type=str)
 parser.add_argument('-f', '--file', help = 'Path to connections file to encrypt/decrypt', nargs = 1, type=str)
-parser.add_argument('-k', '--key', help = '(mandatory from algo 2 and up): Encryption key. Use either "db.system.id" attribute from "product-preferences.xml" if reading from SQL Developer folder, or the export password if reading and exported file', nargs = 1)
+parser.add_argument('-k', '--key', help = '(mandatory from algo 4 and up): Encryption key. Use either "db.system.id" attribute from "product-preferences.xml" if reading from SQL Developer folder, or the export password if reading and exported file', nargs = 1)
 parser.add_argument('-a', '--algo', help = 
 '''
-(mandatory) Encryption algorythm version:\n
+Encryption algorythm version:\n
   - 3 for product version up to 3,\n
   - 4 for product version between 4 an d 19.1,\n
   - 19_2 for product version between 19.2 and 22.2,\n
